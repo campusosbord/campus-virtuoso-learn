@@ -26,17 +26,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchUserRole = async (userId: string) => {
     try {
       console.log('Fetching user role for:', userId);
-      const { data, error } = await supabase.rpc('get_user_role', { _user_id: userId });
+      
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .maybeSingle();
       
       if (error) {
         console.error('Error fetching user role:', error);
+        setUserRole('student'); // Default role
         return;
       }
       
-      console.log('User role fetched:', data);
-      setUserRole(data);
+      const role = data?.role || 'student';
+      console.log('User role fetched:', role);
+      setUserRole(role);
     } catch (error) {
       console.error('Error in fetchUserRole:', error);
+      setUserRole('student'); // Default role
     }
   };
 
@@ -77,9 +85,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (session?.user) {
         fetchUserRole(session.user.id);
+      } else {
+        setLoading(false);
       }
-      
-      setLoading(false);
     });
 
     return () => {
@@ -91,6 +99,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signIn = async (email: string, password: string) => {
     try {
       console.log('Attempting sign in for:', email);
+      setLoading(true);
+      
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -113,18 +123,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { error };
     } catch (error) {
       console.error('Sign in error:', error);
+      toast({
+        title: "Error de conexión",
+        description: "No se pudo conectar al servidor",
+        variant: "destructive",
+      });
       return { error };
+    } finally {
+      setLoading(false);
     }
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
       console.log('Attempting sign up for:', email);
+      setLoading(true);
+      
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
+          emailRedirectTo: `${window.location.origin}/dashboard`,
           data: {
             full_name: fullName,
           },
@@ -141,24 +160,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } else {
         toast({
           title: "Registro exitoso",
-          description: "Por favor revisa tu email para confirmar tu cuenta.",
+          description: "Revisa tu email para confirmar tu cuenta.",
         });
       }
       
       return { error };
     } catch (error) {
       console.error('Sign up error:', error);
+      toast({
+        title: "Error de conexión",
+        description: "No se pudo conectar al servidor",
+        variant: "destructive",
+      });
       return { error };
+    } finally {
+      setLoading(false);
     }
   };
 
   const signOut = async () => {
-    console.log('Signing out');
-    await supabase.auth.signOut();
-    toast({
-      title: "Sesión cerrada",
-      description: "Has cerrado sesión exitosamente.",
-    });
+    try {
+      console.log('Signing out');
+      setLoading(true);
+      await supabase.auth.signOut();
+      setUserRole(null);
+      toast({
+        title: "Sesión cerrada",
+        description: "Has cerrado sesión exitosamente.",
+      });
+    } catch (error) {
+      console.error('Sign out error:', error);
+      toast({
+        title: "Error",
+        description: "Error al cerrar sesión",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const value = {

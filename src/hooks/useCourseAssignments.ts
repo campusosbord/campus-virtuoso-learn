@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -13,7 +14,9 @@ export const useCourseAssignments = () => {
   const fetchData = async () => {
     try {
       console.log('Fetching assignments data...');
+      setIsLoading(true);
 
+      // Fetch assignments with related data
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from('course_assignments')
         .select(`
@@ -25,12 +28,17 @@ export const useCourseAssignments = () => {
             id,
             title,
             description,
-            status
+            status,
+            start_date,
+            end_date,
+            created_at,
+            created_by
           ),
           profiles (
             id,
             email,
-            full_name
+            full_name,
+            created_at
           )
         `);
 
@@ -39,14 +47,18 @@ export const useCourseAssignments = () => {
         throw assignmentsError;
       }
 
+      // Fetch active courses
       const { data: coursesData, error: coursesError } = await supabase
         .from('courses')
         .select(`
-          *,
-          profiles (
-            full_name,
-            email
-          )
+          id,
+          title,
+          description,
+          status,
+          start_date,
+          end_date,
+          created_at,
+          created_by
         `)
         .eq('status', 'active');
 
@@ -55,7 +67,8 @@ export const useCourseAssignments = () => {
         throw coursesError;
       }
 
-      const { data: studentsData, error: studentsError } = await supabase
+      // Fetch all profiles first
+      const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select(`
           id,
@@ -64,32 +77,38 @@ export const useCourseAssignments = () => {
           created_at
         `);
 
-      if (studentsError) {
-        console.error('Error fetching students:', studentsError);
-        throw studentsError;
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        throw profilesError;
       }
 
+      // Filter students by role
       const studentsWithRole: Profile[] = [];
-      if (studentsData) {
-        for (const student of studentsData) {
-          const { data: roleData } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', student.id)
-            .eq('role', 'student')
-            .single();
+      if (profilesData) {
+        for (const profile of profilesData) {
+          try {
+            const { data: roleData } = await supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', profile.id)
+              .eq('role', 'student')
+              .maybeSingle();
 
-          if (roleData) {
-            studentsWithRole.push({
-              id: student.id,
-              email: student.email,
-              full_name: student.full_name,
-              created_at: student.created_at
-            });
+            if (roleData) {
+              studentsWithRole.push({
+                id: profile.id,
+                email: profile.email,
+                full_name: profile.full_name,
+                created_at: profile.created_at
+              });
+            }
+          } catch (error) {
+            console.error('Error checking role for user:', profile.id, error);
           }
         }
       }
 
+      // Process assignments
       const validAssignments: Assignment[] = [];
       if (assignmentsData) {
         assignmentsData.forEach((item: any) => {
@@ -97,22 +116,39 @@ export const useCourseAssignments = () => {
             item.courses && 
             typeof item.courses === 'object' && 
             item.profiles && 
-            typeof item.profiles === 'object' && 
-            item.profiles.email
+            typeof item.profiles === 'object'
           ) {
             validAssignments.push({
               id: item.id,
               course_id: item.course_id,
               user_id: item.user_id,
               assigned_at: item.assigned_at,
-              courses: item.courses as Course,
-              profiles: item.profiles as Profile
+              courses: {
+                id: item.courses.id,
+                title: item.courses.title,
+                description: item.courses.description,
+                status: item.courses.status,
+                start_date: item.courses.start_date,
+                end_date: item.courses.end_date,
+                created_at: item.courses.created_at,
+                created_by: item.courses.created_by,
+                profiles: {
+                  full_name: null,
+                  email: ''
+                }
+              },
+              profiles: {
+                id: item.profiles.id,
+                email: item.profiles.email,
+                full_name: item.profiles.full_name,
+                created_at: item.profiles.created_at
+              }
             });
           }
         });
       }
 
-      // Transform courses data to match Course type
+      // Process courses
       const transformedCourses: Course[] = [];
       if (coursesData) {
         coursesData.forEach((course: any) => {
@@ -125,7 +161,10 @@ export const useCourseAssignments = () => {
             end_date: course.end_date,
             created_at: course.created_at,
             created_by: course.created_by,
-            profiles: course.profiles
+            profiles: {
+              full_name: null,
+              email: ''
+            }
           });
         });
       }
@@ -137,7 +176,7 @@ export const useCourseAssignments = () => {
       console.error('Error fetching data:', error);
       toast({
         title: "Error",
-        description: "No se pudieron cargar los datos. Verifica que tengas permisos de administrador.",
+        description: "No se pudieron cargar los datos. Intenta recargar la página.",
         variant: "destructive",
       });
     } finally {
@@ -151,12 +190,16 @@ export const useCourseAssignments = () => {
       
       const { data: currentUser } = await supabase.auth.getUser();
       
+      if (!currentUser.user) {
+        throw new Error('Usuario no autenticado');
+      }
+
       const { error } = await supabase
         .from('course_assignments')
         .insert({
           course_id: courseId,
           user_id: studentId,
-          assigned_by: currentUser.user?.id
+          assigned_by: currentUser.user.id
         });
 
       if (error) {
@@ -169,12 +212,12 @@ export const useCourseAssignments = () => {
         description: "Curso asignado correctamente",
       });
 
-      fetchData();
+      await fetchData();
     } catch (error) {
       console.error('Error assigning course:', error);
       toast({
         title: "Error",
-        description: "No se pudo asignar el curso",
+        description: "No se pudo asignar el curso. Verifica tu conexión.",
         variant: "destructive",
       });
     }
@@ -199,12 +242,12 @@ export const useCourseAssignments = () => {
         description: "Asignación eliminada correctamente",
       });
 
-      fetchData();
+      await fetchData();
     } catch (error) {
       console.error('Error removing assignment:', error);
       toast({
         title: "Error",
-        description: "No se pudo eliminar la asignación",
+        description: "No se pudo eliminar la asignación. Verifica tu conexión.",
         variant: "destructive",
       });
     }
