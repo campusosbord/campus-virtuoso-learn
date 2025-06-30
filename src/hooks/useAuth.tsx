@@ -21,10 +21,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [roleLoading, setRoleLoading] = useState(false);
   const { toast } = useToast();
 
   const fetchUserRole = async (userId: string) => {
+    // Prevent multiple simultaneous role fetches
+    if (roleLoading) return;
+    
     try {
+      setRoleLoading(true);
       console.log('🔍 Fetching user role for:', userId);
       
       const { data, error } = await supabase
@@ -35,7 +40,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (error) {
         console.error('❌ Error fetching user role:', error);
-        setUserRole('student'); // Default role
+        setUserRole('student'); // Fallback to default role
         return;
       }
       
@@ -44,27 +49,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUserRole(role);
     } catch (error) {
       console.error('❌ Error in fetchUserRole:', error);
-      setUserRole('student'); // Default role
+      setUserRole('student'); // Fallback to default role
+    } finally {
+      setRoleLoading(false);
     }
   };
 
   useEffect(() => {
     console.log('🚀 Setting up auth state listener');
     
+    let isSubscribed = true;
+    
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!isSubscribed) return;
+        
         console.log('🔄 Auth state changed:', event, 'User ID:', session?.user?.id);
+        
         setSession(session);
         setUser(session?.user ?? null);
         
-        if (session?.user) {
+        if (session?.user && event !== 'TOKEN_REFRESHED') {
           console.log('👤 User authenticated, fetching role...');
-          // Use setTimeout to avoid potential issues with RLS
+          // Use setTimeout to prevent potential RLS deadlocks
           setTimeout(() => {
-            fetchUserRole(session.user.id);
+            if (isSubscribed) {
+              fetchUserRole(session.user.id);
+            }
           }, 100);
-        } else {
+        } else if (!session?.user) {
           console.log('👤 No user session found');
           setUserRole(null);
         }
@@ -74,28 +88,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     );
 
     // Check for existing session
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      if (error) {
-        console.error('❌ Error getting initial session:', error);
-        setLoading(false);
-        return;
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('❌ Error getting initial session:', error);
+          setLoading(false);
+          return;
+        }
+        
+        if (!isSubscribed) return;
+        
+        console.log('🔍 Initial session check - User ID:', session?.user?.id);
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          console.log('👤 Found existing session, fetching role...');
+          setTimeout(() => {
+            if (isSubscribed) {
+              fetchUserRole(session.user.id);
+            }
+          }, 100);
+        } else {
+          console.log('👤 No existing session found');
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('❌ Error initializing auth:', error);
+        if (isSubscribed) {
+          setLoading(false);
+        }
       }
-      
-      console.log('🔍 Initial session check - User ID:', session?.user?.id);
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        console.log('👤 Found existing session, fetching role...');
-        fetchUserRole(session.user.id);
-      } else {
-        console.log('👤 No existing session found');
-        setLoading(false);
-      }
-    });
+    };
+
+    initializeAuth();
 
     return () => {
       console.log('🧹 Cleaning up auth subscription');
+      isSubscribed = false;
       subscription.unsubscribe();
     };
   }, []);
@@ -220,6 +252,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     userId: user?.id, 
     userRole, 
     loading,
+    roleLoading,
     hasSession: !!session 
   });
 

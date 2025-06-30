@@ -39,7 +39,7 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
-  // Check role requirements
+  // Check role requirements if specified
   if (requiredRole && userRole !== requiredRole) {
     console.log('❌ ProtectedRoute: Insufficient role, redirecting to dashboard');
     return <Navigate to="/dashboard" replace />;

@@ -47,10 +47,13 @@ const Auth = () => {
     }
     
     try {
-      await signIn(email, password);
+      const { error } = await signIn(email, password);
+      if (error) {
+        setErrors({ form: 'Credenciales incorrectas' });
+      }
     } catch (error) {
       console.error('Sign in error:', error);
-      setErrors({ form: 'Error al iniciar sesión' });
+      setErrors({ form: 'Error de conexión' });
     } finally {
       setIsLoading(false);
     }
@@ -86,10 +89,13 @@ const Auth = () => {
     }
     
     try {
-      await signUp(email, password, fullName);
+      const { error } = await signUp(email, password, fullName);
+      if (error) {
+        setErrors({ form: 'Error al crear la cuenta' });
+      }
     } catch (error) {
       console.error('Sign up error:', error);
-      setErrors({ form: 'Error al registrarse' });
+      setErrors({ form: 'Error de conexión' });
     } finally {
       setIsLoading(false);
     }
@@ -138,6 +144,7 @@ const Auth = () => {
                     placeholder="tu@email.com"
                     required
                     className={errors.email ? 'border-red-500' : ''}
+                    disabled={isLoading || loading}
                   />
                   {errors.email && (
                     <p className="text-sm text-red-600">{errors.email}</p>
@@ -150,6 +157,7 @@ const Auth = () => {
                     name="password"
                     type="password"
                     required
+                    disabled={isLoading || loading}
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading || loading}>
@@ -173,6 +181,7 @@ const Auth = () => {
                     type="text"
                     placeholder="Tu nombre completo"
                     required
+                    disabled={isLoading || loading}
                   />
                 </div>
                 <div className="space-y-2">
@@ -184,6 +193,7 @@ const Auth = () => {
                     placeholder="tu@email.com"
                     required
                     className={errors.email ? 'border-red-500' : ''}
+                    disabled={isLoading || loading}
                   />
                   {errors.email && (
                     <p className="text-sm text-red-600">{errors.email}</p>
@@ -198,6 +208,7 @@ const Auth = () => {
                     minLength={6}
                     required
                     className={errors.password ? 'border-red-500' : ''}
+                    disabled={isLoading || loading}
                   />
                   {errors.password && (
                     <p className="text-sm text-red-600">{errors.password}</p>

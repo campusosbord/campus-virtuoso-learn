@@ -11,11 +11,16 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
 
+// Optimized React Query configuration to prevent timeout issues
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000, // 5 minutes
-      retry: 3,
+      cacheTime: 10 * 60 * 1000, // 10 minutes
+      retry: 2, // Reduced from 3 to prevent excessive retries
+      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
+      refetchOnWindowFocus: false, // Prevent unnecessary refetches
+      refetchOnMount: false, // Prevent unnecessary refetches on mount
     },
   },
 });
