@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,6 +29,16 @@ interface Assignment {
   assigned_at: string;
   courses: Course;
   profiles: Profile;
+}
+
+// Type for the raw Supabase query result
+interface RawAssignmentData {
+  id: string;
+  course_id: string;
+  user_id: string;
+  assigned_at: string;
+  courses: Course | null;
+  profiles: Profile | null | { error: boolean };
 }
 
 const CourseAssignments = () => {
@@ -78,14 +87,35 @@ const CourseAssignments = () => {
 
       if (studentsError) throw studentsError;
 
-      // Properly type and filter the assignments data
-      const typedAssignments = (assignmentsData || []).filter((assignment: any) => 
-        assignment.courses && assignment.profiles && 
-        typeof assignment.profiles === 'object' && 
-        !assignment.profiles.error
-      ) as Assignment[];
+      // Process and filter the assignments data with proper type checking
+      const validAssignments: Assignment[] = [];
+      
+      if (assignmentsData) {
+        assignmentsData.forEach((item: any) => {
+          // Check if both courses and profiles are valid objects
+          if (
+            item.courses && 
+            typeof item.courses === 'object' && 
+            item.courses.id &&
+            item.profiles && 
+            typeof item.profiles === 'object' && 
+            item.profiles.id &&
+            item.profiles.email &&
+            !('error' in item.profiles)
+          ) {
+            validAssignments.push({
+              id: item.id,
+              course_id: item.course_id,
+              user_id: item.user_id,
+              assigned_at: item.assigned_at,
+              courses: item.courses as Course,
+              profiles: item.profiles as Profile
+            });
+          }
+        });
+      }
 
-      setAssignments(typedAssignments);
+      setAssignments(validAssignments);
       setCourses(coursesData || []);
       setStudents(studentsData || []);
     } catch (error) {
