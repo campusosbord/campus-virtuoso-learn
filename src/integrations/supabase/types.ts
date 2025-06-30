@@ -447,6 +447,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      expire_old_courses: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      get_course_completion_percentage: {
+        Args: { course_id_param: string; user_id_param: string }
+        Returns: number
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]

@@ -59,9 +59,9 @@ const Dashboard = () => {
       if (userRole === 'student') {
         await fetchStudentData();
       } else if (userRole === 'teacher') {
-        // await fetchTeacherData();
+        await fetchTeacherData();
       } else if (userRole === 'admin') {
-        // await fetchAdminData();
+        // Admin dashboard is handled by AdminDashboard component
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -119,6 +119,31 @@ const Dashboard = () => {
     }
   };
 
+  const fetchTeacherData = async () => {
+    // Fetch courses created by the teacher
+    const { data: teacherCourses } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('created_by', user?.id);
+
+    if (teacherCourses) {
+      setCourses(teacherCourses);
+      
+      // Get student count for teacher's courses
+      const { data: assignments } = await supabase
+        .from('course_assignments')
+        .select('user_id', { count: 'exact' })
+        .in('course_id', teacherCourses.map(c => c.id));
+
+      setStats({
+        totalCourses: teacherCourses.length,
+        completedCourses: 0,
+        activeCourses: teacherCourses.filter(c => c.status === 'active').length,
+        totalStudents: assignments?.length || 0
+      });
+    }
+  };
+
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case 'active': return 'default';
@@ -166,13 +191,6 @@ const Dashboard = () => {
               Bienvenido, {user?.email}
             </p>
           </div>
-          
-          {userRole === 'teacher' && (
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Crear Curso
-            </Button>
-          )}
         </div>
 
         {/* Stats Cards */}
@@ -180,7 +198,7 @@ const Dashboard = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                {userRole === 'student' ? 'Cursos Asignados' : 'Total Cursos'}
+                Cursos Asignados
               </CardTitle>
               <BookOpen className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -192,38 +210,30 @@ const Dashboard = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                {userRole === 'student' ? 'Cursos Completados' : 'Cursos Activos'}
+                Cursos Completados
               </CardTitle>
-              {userRole === 'student' ? (
-                <Award className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <GraduationCap className="h-4 w-4 text-muted-foreground" />
-              )}
+              <Award className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {userRole === 'student' ? stats.completedCourses : stats.activeCourses}
-              </div>
+              <div className="text-2xl font-bold">{stats.completedCourses}</div>
             </CardContent>
           </Card>
 
-          {userRole !== 'student' && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Estudiantes</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.totalStudents}</div>
-              </CardContent>
-            </Card>
-          )}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Cursos Activos</CardTitle>
+              <GraduationCap className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.activeCourses}</div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Courses Section */}
         <div>
           <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            {userRole === 'student' ? 'Mis Cursos' : 'Cursos'}
+            Mis Cursos
           </h2>
           
           {courses.length === 0 ? (
@@ -234,10 +244,7 @@ const Dashboard = () => {
                   No hay cursos disponibles
                 </h3>
                 <p className="text-gray-600 text-center">
-                  {userRole === 'student' 
-                    ? 'No tienes cursos asignados aún.'
-                    : 'Comienza creando tu primer curso.'
-                  }
+                  No tienes cursos asignados aún.
                 </p>
               </CardContent>
             </Card>

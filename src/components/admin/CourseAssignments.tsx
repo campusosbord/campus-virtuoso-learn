@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,16 +32,6 @@ interface Assignment {
   profiles: Profile;
 }
 
-// Type for the raw Supabase query result
-interface RawAssignmentData {
-  id: string;
-  course_id: string;
-  user_id: string;
-  assigned_at: string;
-  courses: Course | null;
-  profiles: Profile | null | { error: boolean };
-}
-
 const CourseAssignments = () => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -57,7 +48,7 @@ const CourseAssignments = () => {
 
   const fetchData = async () => {
     try {
-      // Fetch assignments
+      // Fetch assignments with proper joins
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from('course_assignments')
         .select(`
@@ -68,7 +59,7 @@ const CourseAssignments = () => {
 
       if (assignmentsError) throw assignmentsError;
 
-      // Fetch courses
+      // Fetch active courses
       const { data: coursesData, error: coursesError } = await supabase
         .from('courses')
         .select('*')
@@ -76,7 +67,7 @@ const CourseAssignments = () => {
 
       if (coursesError) throw coursesError;
 
-      // Fetch students
+      // Fetch students by joining with user_roles
       const { data: studentsData, error: studentsError } = await supabase
         .from('profiles')
         .select(`
@@ -141,12 +132,14 @@ const CourseAssignments = () => {
     }
 
     try {
+      const { data: currentUser } = await supabase.auth.getUser();
+      
       const { error } = await supabase
         .from('course_assignments')
         .insert({
           course_id: selectedCourse,
           user_id: selectedStudent,
-          assigned_by: (await supabase.auth.getUser()).data.user?.id
+          assigned_by: currentUser.user?.id
         });
 
       if (error) throw error;

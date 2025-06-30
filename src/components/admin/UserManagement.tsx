@@ -6,11 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Users, UserPlus, Edit, Trash2 } from 'lucide-react';
+import { Users, Edit } from 'lucide-react';
 
 interface Profile {
   id: string;
@@ -68,6 +67,8 @@ const UserManagement = () => {
 
   const updateUserRole = async (userId: string, role: 'admin' | 'teacher' | 'student') => {
     try {
+      const { data: currentUser } = await supabase.auth.getUser();
+      
       // Delete existing role
       await supabase
         .from('user_roles')
@@ -79,7 +80,8 @@ const UserManagement = () => {
         .from('user_roles')
         .insert({
           user_id: userId,
-          role: role
+          role: role,
+          assigned_by: currentUser.user?.id
         });
 
       if (error) throw error;
