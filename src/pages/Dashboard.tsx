@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,7 +38,7 @@ interface CourseWithProgress extends Course {
 }
 
 const Dashboard = () => {
-  const { user, userRole, loading } = useAuth();
+  const { user, userRole, loading: authLoading } = useAuth();
   const [courses, setCourses] = useState<CourseWithProgress[]>([]);
   const [stats, setStats] = useState({
     totalCourses: 0,
@@ -45,7 +46,7 @@ const Dashboard = () => {
     activeCourses: 0,
     totalStudents: 0
   });
-  const [loading, setLoading] = useState(true);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
 
   useEffect(() => {
     if (user && userRole) {
@@ -65,7 +66,7 @@ const Dashboard = () => {
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
-      setLoading(false);
+      setDashboardLoading(false);
     }
   };
 
@@ -136,7 +137,7 @@ const Dashboard = () => {
     }
   };
 
-  if (loading) {
+  if (authLoading || dashboardLoading) {
     return (
       <Layout>
         <div className="flex items-center justify-center h-64">

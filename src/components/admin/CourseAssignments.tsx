@@ -38,7 +38,7 @@ const CourseAssignments = () => {
   const [students, setStudents] = useState<Profile[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<string>('');
   const [selectedStudent, setSelectedStudent] = useState<string>('');
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
 
@@ -78,7 +78,14 @@ const CourseAssignments = () => {
 
       if (studentsError) throw studentsError;
 
-      setAssignments(assignmentsData || []);
+      // Properly type and filter the assignments data
+      const typedAssignments = (assignmentsData || []).filter((assignment: any) => 
+        assignment.courses && assignment.profiles && 
+        typeof assignment.profiles === 'object' && 
+        !assignment.profiles.error
+      ) as Assignment[];
+
+      setAssignments(typedAssignments);
       setCourses(coursesData || []);
       setStudents(studentsData || []);
     } catch (error) {
@@ -89,7 +96,7 @@ const CourseAssignments = () => {
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -158,7 +165,7 @@ const CourseAssignments = () => {
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-32">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
