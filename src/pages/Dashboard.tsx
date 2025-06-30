@@ -14,7 +14,7 @@ const Dashboard = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Cargando dashboard...</p>
         </div>
       </div>
@@ -29,9 +29,15 @@ const Dashboard = () => {
           <h2 className="text-2xl font-bold text-gray-900 mb-4">
             Error de autenticación
           </h2>
-          <p className="text-gray-600">
+          <p className="text-gray-600 mb-4">
             No se pudo cargar la información del usuario.
           </p>
+          <button 
+            onClick={() => window.location.href = '/auth'}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          >
+            Ir a Login
+          </button>
         </div>
       </Layout>
     );
@@ -39,6 +45,7 @@ const Dashboard = () => {
 
   console.log('🎯 Rendering dashboard for role:', userRole);
 
+  // Render based on user role
   if (userRole === 'admin') {
     console.log('👑 Rendering Admin Dashboard');
     return <AdminDashboard />;
@@ -57,7 +64,7 @@ const Dashboard = () => {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Panel del Estudiante</h1>
           <p className="text-gray-600">
-            Bienvenido a tu dashboard de estudiante
+            Bienvenido a tu dashboard de estudiante, {user.email}
           </p>
         </div>
 
@@ -72,6 +79,14 @@ const Dashboard = () => {
           <h2 className="text-xl font-semibold mb-4">Progreso</h2>
           <p className="text-gray-600">
             Aquí podrás ver tu progreso en los cursos.
+          </p>
+        </div>
+
+        {/* Debug info */}
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <h3 className="font-medium text-yellow-800 mb-2">🔧 Info de Debug:</h3>
+          <p className="text-sm text-yellow-700">
+            Usuario: {user.email} | Rol: {userRole || 'Sin rol'} | ID: {user.id}
           </p>
         </div>
       </div>

@@ -20,23 +20,26 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     currentPath: location.pathname 
   });
 
+  // Show loading state while checking authentication
   if (loading) {
     console.log('⏳ ProtectedRoute: Auth is loading...');
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Verificando autenticación...</p>
         </div>
       </div>
     );
   }
 
+  // Redirect to auth if no user
   if (!user) {
     console.log('❌ ProtectedRoute: No user found, redirecting to auth');
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
+  // Check role requirements
   if (requiredRole && userRole !== requiredRole) {
     console.log('❌ ProtectedRoute: Insufficient role, redirecting to dashboard');
     return <Navigate to="/dashboard" replace />;
