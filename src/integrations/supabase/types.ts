@@ -447,6 +447,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_course_expiry: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       expire_old_courses: {
         Args: Record<PropertyKey, never>
         Returns: undefined

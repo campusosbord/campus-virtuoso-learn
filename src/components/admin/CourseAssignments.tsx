@@ -48,16 +48,33 @@ const CourseAssignments = () => {
 
   const fetchData = async () => {
     try {
-      // Fetch assignments with proper joins
+      console.log('Fetching assignments data...');
+
+      // Fetch assignments with related data
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from('course_assignments')
         .select(`
-          *,
-          courses (*),
-          profiles (*)
+          id,
+          course_id,
+          user_id,
+          assigned_at,
+          courses (
+            id,
+            title,
+            description,
+            status
+          ),
+          profiles (
+            id,
+            email,
+            full_name
+          )
         `);
 
-      if (assignmentsError) throw assignmentsError;
+      if (assignmentsError) {
+        console.error('Error fetching assignments:', assignmentsError);
+        throw assignmentsError;
+      }
 
       // Fetch active courses
       const { data: coursesData, error: coursesError } = await supabase
@@ -65,34 +82,52 @@ const CourseAssignments = () => {
         .select('*')
         .eq('status', 'active');
 
-      if (coursesError) throw coursesError;
+      if (coursesError) {
+        console.error('Error fetching courses:', coursesError);
+        throw coursesError;
+      }
 
-      // Fetch students by joining with user_roles
+      // Fetch students
       const { data: studentsData, error: studentsError } = await supabase
         .from('profiles')
         .select(`
-          *,
-          user_roles!inner (role)
-        `)
-        .eq('user_roles.role', 'student');
+          id,
+          email,
+          full_name
+        `);
 
-      if (studentsError) throw studentsError;
+      if (studentsError) {
+        console.error('Error fetching students:', studentsError);
+        throw studentsError;
+      }
 
-      // Process and filter the assignments data with proper type checking
+      // Filter students with student role
+      const studentsWithRole: Profile[] = [];
+      if (studentsData) {
+        for (const student of studentsData) {
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', student.id)
+            .eq('role', 'student')
+            .single();
+
+          if (roleData) {
+            studentsWithRole.push(student);
+          }
+        }
+      }
+
+      // Process assignments data
       const validAssignments: Assignment[] = [];
-      
       if (assignmentsData) {
         assignmentsData.forEach((item: any) => {
-          // Check if both courses and profiles are valid objects
           if (
             item.courses && 
             typeof item.courses === 'object' && 
-            item.courses.id &&
             item.profiles && 
             typeof item.profiles === 'object' && 
-            item.profiles.id &&
-            item.profiles.email &&
-            !('error' in item.profiles)
+            item.profiles.email
           ) {
             validAssignments.push({
               id: item.id,
@@ -106,14 +141,18 @@ const CourseAssignments = () => {
         });
       }
 
+      console.log('Assignments:', validAssignments.length);
+      console.log('Courses:', coursesData?.length);
+      console.log('Students:', studentsWithRole.length);
+
       setAssignments(validAssignments);
       setCourses(coursesData || []);
-      setStudents(studentsData || []);
+      setStudents(studentsWithRole);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch data",
+        description: "No se pudieron cargar los datos. Verifica que tengas permisos de administrador.",
         variant: "destructive",
       });
     } finally {
@@ -132,6 +171,8 @@ const CourseAssignments = () => {
     }
 
     try {
+      console.log('Assigning course:', selectedCourse, 'to student:', selectedStudent);
+      
       const { data: currentUser } = await supabase.auth.getUser();
       
       const { error } = await supabase
@@ -142,7 +183,10 @@ const CourseAssignments = () => {
           assigned_by: currentUser.user?.id
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error assigning course:', error);
+        throw error;
+      }
 
       toast({
         title: "Éxito",
@@ -157,7 +201,7 @@ const CourseAssignments = () => {
       console.error('Error assigning course:', error);
       toast({
         title: "Error",
-        description: "Failed to assign course",
+        description: "No se pudo asignar el curso",
         variant: "destructive",
       });
     }
@@ -165,12 +209,17 @@ const CourseAssignments = () => {
 
   const removeAssignment = async (assignmentId: string) => {
     try {
+      console.log('Removing assignment:', assignmentId);
+      
       const { error } = await supabase
         .from('course_assignments')
         .delete()
         .eq('id', assignmentId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error removing assignment:', error);
+        throw error;
+      }
 
       toast({
         title: "Éxito",
@@ -182,7 +231,7 @@ const CourseAssignments = () => {
       console.error('Error removing assignment:', error);
       toast({
         title: "Error",
-        description: "Failed to remove assignment",
+        description: "No se pudo eliminar la asignación",
         variant: "destructive",
       });
     }
@@ -265,49 +314,55 @@ const CourseAssignments = () => {
         </div>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Curso</TableHead>
-              <TableHead>Estudiante</TableHead>
-              <TableHead>Fecha de Asignación</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {assignments.map((assignment) => (
-              <TableRow key={assignment.id}>
-                <TableCell>
-                  <div className="font-medium">
-                    {assignment.courses.title}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  {assignment.profiles.full_name || assignment.profiles.email}
-                </TableCell>
-                <TableCell>
-                  {new Date(assignment.assigned_at).toLocaleDateString()}
-                </TableCell>
-                <TableCell>
-                  <Badge variant={assignment.courses.status === 'active' ? 'default' : 'secondary'}>
-                    {assignment.courses.status === 'active' ? 'Activo' : 'Inactivo'}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeAssignment(assignment.id)}
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    Remover
-                  </Button>
-                </TableCell>
+        {assignments.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-gray-500">No hay asignaciones de cursos</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Curso</TableHead>
+                <TableHead>Estudiante</TableHead>
+                <TableHead>Fecha de Asignación</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead>Acciones</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {assignments.map((assignment) => (
+                <TableRow key={assignment.id}>
+                  <TableCell>
+                    <div className="font-medium">
+                      {assignment.courses.title}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {assignment.profiles.full_name || assignment.profiles.email}
+                  </TableCell>
+                  <TableCell>
+                    {new Date(assignment.assigned_at).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={assignment.courses.status === 'active' ? 'default' : 'secondary'}>
+                      {assignment.courses.status === 'active' ? 'Activo' : 'Inactivo'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => removeAssignment(assignment.id)}
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Remover
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </CardContent>
     </Card>
   );

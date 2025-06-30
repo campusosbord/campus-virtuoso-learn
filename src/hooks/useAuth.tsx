@@ -25,24 +25,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchUserRole = async (userId: string) => {
     try {
-      const { data } = await supabase.rpc('get_user_role', { _user_id: userId });
+      console.log('Fetching user role for:', userId);
+      const { data, error } = await supabase.rpc('get_user_role', { _user_id: userId });
+      
+      if (error) {
+        console.error('Error fetching user role:', error);
+        return;
+      }
+      
+      console.log('User role fetched:', data);
       setUserRole(data);
     } catch (error) {
-      console.error('Error fetching user role:', error);
+      console.error('Error in fetchUserRole:', error);
     }
   };
 
   useEffect(() => {
+    console.log('Setting up auth state listener');
+    
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.id);
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
+          // Use setTimeout to avoid potential issues with RLS
           setTimeout(() => {
             fetchUserRole(session.user.id);
-          }, 0);
+          }, 100);
         } else {
           setUserRole(null);
         }
@@ -52,7 +64,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     );
 
     // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error('Error getting session:', error);
+        setLoading(false);
+        return;
+      }
+      
+      console.log('Initial session check:', session?.user?.id);
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -63,21 +82,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log('Cleaning up auth subscription');
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
+      console.log('Attempting sign in for:', email);
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       
       if (error) {
+        console.error('Sign in error:', error);
         toast({
           title: "Error al iniciar sesión",
           description: error.message,
           variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Éxito",
+          description: "Has iniciado sesión correctamente",
         });
       }
       
@@ -90,6 +119,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
+      console.log('Attempting sign up for:', email);
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -102,6 +132,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       
       if (error) {
+        console.error('Sign up error:', error);
         toast({
           title: "Error al registrarse",
           description: error.message,
@@ -122,6 +153,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
+    console.log('Signing out');
     await supabase.auth.signOut();
     toast({
       title: "Sesión cerrada",

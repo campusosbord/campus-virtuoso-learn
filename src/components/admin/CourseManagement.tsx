@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, Eye } from 'lucide-react';
+import { Plus, Edit, Trash2 } from 'lucide-react';
 
 interface Course {
   id: string;
@@ -56,6 +56,8 @@ const CourseManagement = () => {
 
   const fetchCourses = async () => {
     try {
+      console.log('Fetching courses...');
+      
       const { data, error } = await supabase
         .from('courses')
         .select(`
@@ -64,14 +66,18 @@ const CourseManagement = () => {
         `)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching courses:', error);
+        throw error;
+      }
 
+      console.log('Courses fetched:', data?.length);
       setCourses(data || []);
     } catch (error) {
       console.error('Error fetching courses:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch courses",
+        description: "No se pudieron cargar los cursos. Verifica que tengas permisos de administrador.",
         variant: "destructive",
       });
     } finally {
@@ -118,6 +124,8 @@ const CourseManagement = () => {
     }
 
     try {
+      console.log('Saving course...');
+      
       const courseData = {
         title: formData.title.trim(),
         description: formData.description.trim() || null,
@@ -132,21 +140,29 @@ const CourseManagement = () => {
           .update(courseData)
           .eq('id', editingCourse.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error updating course:', error);
+          throw error;
+        }
 
         toast({
           title: "Éxito",
           description: "Curso actualizado correctamente",
         });
       } else {
+        const { data: currentUser } = await supabase.auth.getUser();
+        
         const { error } = await supabase
           .from('courses')
           .insert({
             ...courseData,
-            created_by: (await supabase.auth.getUser()).data.user?.id
+            created_by: currentUser.user?.id
           });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error creating course:', error);
+          throw error;
+        }
 
         toast({
           title: "Éxito",
@@ -161,7 +177,7 @@ const CourseManagement = () => {
       console.error('Error saving course:', error);
       toast({
         title: "Error",
-        description: "Failed to save course",
+        description: "No se pudo guardar el curso",
         variant: "destructive",
       });
     }
@@ -173,12 +189,17 @@ const CourseManagement = () => {
     }
 
     try {
+      console.log('Deleting course:', courseId);
+      
       const { error } = await supabase
         .from('courses')
         .delete()
         .eq('id', courseId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error deleting course:', error);
+        throw error;
+      }
 
       toast({
         title: "Éxito",
@@ -190,7 +211,7 @@ const CourseManagement = () => {
       console.error('Error deleting course:', error);
       toast({
         title: "Error",
-        description: "Failed to delete course",
+        description: "No se pudo eliminar el curso",
         variant: "destructive",
       });
     }
@@ -239,70 +260,76 @@ const CourseManagement = () => {
         </div>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Título</TableHead>
-              <TableHead>Creador</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Fecha de Inicio</TableHead>
-              <TableHead>Fecha de Fin</TableHead>
-              <TableHead>Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {courses.map((course) => (
-              <TableRow key={course.id}>
-                <TableCell>
-                  <div className="font-medium">{course.title}</div>
-                  {course.description && (
-                    <div className="text-sm text-gray-500 truncate max-w-xs">
-                      {course.description}
-                    </div>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {course.profiles.full_name || course.profiles.email}
-                </TableCell>
-                <TableCell>
-                  <Badge variant={getStatusBadgeVariant(course.status)}>
-                    {getStatusText(course.status)}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  {course.start_date 
-                    ? new Date(course.start_date).toLocaleDateString()
-                    : '-'
-                  }
-                </TableCell>
-                <TableCell>
-                  {course.end_date 
-                    ? new Date(course.end_date).toLocaleDateString()
-                    : '-'
-                  }
-                </TableCell>
-                <TableCell>
-                  <div className="flex space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openEditDialog(course)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => deleteCourse(course.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </TableCell>
+        {courses.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-gray-500">No hay cursos disponibles</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Título</TableHead>
+                <TableHead>Creador</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead>Fecha de Inicio</TableHead>
+                <TableHead>Fecha de Fin</TableHead>
+                <TableHead>Acciones</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {courses.map((course) => (
+                <TableRow key={course.id}>
+                  <TableCell>
+                    <div className="font-medium">{course.title}</div>
+                    {course.description && (
+                      <div className="text-sm text-gray-500 truncate max-w-xs">
+                        {course.description}
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {course.profiles.full_name || course.profiles.email}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={getStatusBadgeVariant(course.status)}>
+                      {getStatusText(course.status)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {course.start_date 
+                      ? new Date(course.start_date).toLocaleDateString()
+                      : '-'
+                    }
+                  </TableCell>
+                  <TableCell>
+                    {course.end_date 
+                      ? new Date(course.end_date).toLocaleDateString()
+                      : '-'
+                    }
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openEditDialog(course)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => deleteCourse(course.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="max-w-2xl">
