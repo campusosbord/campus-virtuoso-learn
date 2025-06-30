@@ -25,7 +25,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchUserRole = async (userId: string) => {
     try {
-      console.log('Fetching user role for:', userId);
+      console.log('🔍 Fetching user role for:', userId);
       
       const { data, error } = await supabase
         .from('user_roles')
@@ -34,36 +34,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .maybeSingle();
       
       if (error) {
-        console.error('Error fetching user role:', error);
+        console.error('❌ Error fetching user role:', error);
         setUserRole('student'); // Default role
         return;
       }
       
       const role = data?.role || 'student';
-      console.log('User role fetched:', role);
+      console.log('✅ User role fetched successfully:', role);
       setUserRole(role);
     } catch (error) {
-      console.error('Error in fetchUserRole:', error);
+      console.error('❌ Error in fetchUserRole:', error);
       setUserRole('student'); // Default role
     }
   };
 
   useEffect(() => {
-    console.log('Setting up auth state listener');
+    console.log('🚀 Setting up auth state listener');
     
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.id);
+        console.log('🔄 Auth state changed:', event, 'User ID:', session?.user?.id);
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
+          console.log('👤 User authenticated, fetching role...');
           // Use setTimeout to avoid potential issues with RLS
           setTimeout(() => {
             fetchUserRole(session.user.id);
           }, 100);
         } else {
+          console.log('👤 No user session found');
           setUserRole(null);
         }
         
@@ -74,31 +76,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (error) {
-        console.error('Error getting session:', error);
+        console.error('❌ Error getting initial session:', error);
         setLoading(false);
         return;
       }
       
-      console.log('Initial session check:', session?.user?.id);
+      console.log('🔍 Initial session check - User ID:', session?.user?.id);
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user) {
+        console.log('👤 Found existing session, fetching role...');
         fetchUserRole(session.user.id);
       } else {
+        console.log('👤 No existing session found');
         setLoading(false);
       }
     });
 
     return () => {
-      console.log('Cleaning up auth subscription');
+      console.log('🧹 Cleaning up auth subscription');
       subscription.unsubscribe();
     };
   }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
-      console.log('Attempting sign in for:', email);
+      console.log('🔐 Attempting sign in for:', email);
       setLoading(true);
       
       const { error } = await supabase.auth.signInWithPassword({
@@ -107,13 +111,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       
       if (error) {
-        console.error('Sign in error:', error);
+        console.error('❌ Sign in error:', error);
         toast({
           title: "Error al iniciar sesión",
           description: error.message,
           variant: "destructive",
         });
       } else {
+        console.log('✅ Sign in successful');
         toast({
           title: "Éxito",
           description: "Has iniciado sesión correctamente",
@@ -122,7 +127,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       return { error };
     } catch (error) {
-      console.error('Sign in error:', error);
+      console.error('❌ Sign in error:', error);
       toast({
         title: "Error de conexión",
         description: "No se pudo conectar al servidor",
@@ -136,7 +141,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
-      console.log('Attempting sign up for:', email);
+      console.log('📝 Attempting sign up for:', email);
       setLoading(true);
       
       const { error } = await supabase.auth.signUp({
@@ -151,13 +156,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       
       if (error) {
-        console.error('Sign up error:', error);
+        console.error('❌ Sign up error:', error);
         toast({
           title: "Error al registrarse",
           description: error.message,
           variant: "destructive",
         });
       } else {
+        console.log('✅ Sign up successful');
         toast({
           title: "Registro exitoso",
           description: "Revisa tu email para confirmar tu cuenta.",
@@ -166,7 +172,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       return { error };
     } catch (error) {
-      console.error('Sign up error:', error);
+      console.error('❌ Sign up error:', error);
       toast({
         title: "Error de conexión",
         description: "No se pudo conectar al servidor",
@@ -180,7 +186,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = async () => {
     try {
-      console.log('Signing out');
+      console.log('🚪 Signing out');
       setLoading(true);
       await supabase.auth.signOut();
       setUserRole(null);
@@ -189,7 +195,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         description: "Has cerrado sesión exitosamente.",
       });
     } catch (error) {
-      console.error('Sign out error:', error);
+      console.error('❌ Sign out error:', error);
       toast({
         title: "Error",
         description: "Error al cerrar sesión",
@@ -209,6 +215,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     signUp,
     signOut,
   };
+
+  console.log('🎯 Current auth state:', { 
+    userId: user?.id, 
+    userRole, 
+    loading,
+    hasSession: !!session 
+  });
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

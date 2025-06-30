@@ -3,8 +3,13 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { GraduationCap, BookOpen, Users, Award, ArrowRight } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 const Index = () => {
+  const { user, loading } = useAuth();
+
+  console.log('🏠 Index page render - User:', user?.id, 'Loading:', loading);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Hero Section */}
@@ -21,14 +26,33 @@ const Index = () => {
             seguimiento de progreso y evaluaciones interactivas.
           </p>
           <div className="space-x-4">
-            <Button asChild size="lg">
-              <Link to="/auth">
-                Comenzar Ahora
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
+            {user ? (
+              <Button asChild size="lg">
+                <Link to="/dashboard">
+                  Ir al Dashboard
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            ) : (
+              <Button asChild size="lg">
+                <Link to="/auth">
+                  Comenzar Ahora
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            )}
           </div>
         </div>
+
+        {/* Debug info for development */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-8">
+            <h3 className="font-medium text-yellow-800 mb-2">🔧 Debug Info:</h3>
+            <p className="text-sm text-yellow-700">
+              Estado de autenticación: {loading ? 'Cargando...' : user ? `Logueado como ${user.email}` : 'No logueado'}
+            </p>
+          </div>
+        )}
 
         {/* Features Section */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
@@ -107,12 +131,21 @@ const Index = () => {
           <p className="text-xl text-gray-600 mb-8">
             Únete a Campus Virtual y transforma tu experiencia de aprendizaje
           </p>
-          <Button asChild size="lg">
-            <Link to="/auth">
-              Acceder a la Plataforma
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
+          {user ? (
+            <Button asChild size="lg">
+              <Link to="/dashboard">
+                Ir al Dashboard
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          ) : (
+            <Button asChild size="lg">
+              <Link to="/auth">
+                Acceder a la Plataforma
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
     </div>
