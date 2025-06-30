@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -42,7 +41,13 @@ export const useCourseAssignments = () => {
 
       const { data: coursesData, error: coursesError } = await supabase
         .from('courses')
-        .select('*')
+        .select(`
+          *,
+          profiles (
+            full_name,
+            email
+          )
+        `)
         .eq('status', 'active');
 
       if (coursesError) {
@@ -55,7 +60,8 @@ export const useCourseAssignments = () => {
         .select(`
           id,
           email,
-          full_name
+          full_name,
+          created_at
         `);
 
       if (studentsError) {
@@ -74,7 +80,12 @@ export const useCourseAssignments = () => {
             .single();
 
           if (roleData) {
-            studentsWithRole.push(student);
+            studentsWithRole.push({
+              id: student.id,
+              email: student.email,
+              full_name: student.full_name,
+              created_at: student.created_at
+            });
           }
         }
       }
@@ -101,8 +112,26 @@ export const useCourseAssignments = () => {
         });
       }
 
+      // Transform courses data to match Course type
+      const transformedCourses: Course[] = [];
+      if (coursesData) {
+        coursesData.forEach((course: any) => {
+          transformedCourses.push({
+            id: course.id,
+            title: course.title,
+            description: course.description,
+            status: course.status,
+            start_date: course.start_date,
+            end_date: course.end_date,
+            created_at: course.created_at,
+            created_by: course.created_by,
+            profiles: course.profiles
+          });
+        });
+      }
+
       setAssignments(validAssignments);
-      setCourses(coursesData || []);
+      setCourses(transformedCourses);
       setStudents(studentsWithRole);
     } catch (error) {
       console.error('Error fetching data:', error);
