@@ -1,0 +1,242 @@
+
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
+import { Users, UserPlus, Edit, Trash2 } from 'lucide-react';
+
+interface Profile {
+  id: string;
+  email: string;
+  full_name: string | null;
+  created_at: string;
+}
+
+interface UserRole {
+  id: string;
+  user_id: string;
+  role: 'admin' | 'teacher' | 'student';
+  assigned_at: string;
+}
+
+interface UserWithRole extends Profile {
+  user_roles: UserRole[];
+}
+
+const UserManagement = () => {
+  const [users, setUsers] = useState<UserWithRole[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
+  const [newRole, setNewRole] = useState<'admin' | 'teacher' | 'student'>('student');
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select(`
+          *,
+          user_roles (*)
+        `);
+
+      if (profilesError) throw profilesError;
+
+      setUsers(profiles || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch users",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateUserRole = async (userId: string, role: 'admin' | 'teacher' | 'student') => {
+    try {
+      // Delete existing role
+      await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', userId);
+
+      // Insert new role
+      const { error } = await supabase
+        .from('user_roles')
+        .insert({
+          user_id: userId,
+          role: role
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Éxito",
+        description: "Rol actualizado correctamente",
+      });
+
+      fetchUsers();
+      setIsDialogOpen(false);
+      setSelectedUser(null);
+    } catch (error) {
+      console.error('Error updating user role:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update user role",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getRoleBadgeVariant = (role: string) => {
+    switch (role) {
+      case 'admin': return 'destructive';
+      case 'teacher': return 'default';
+      case 'student': return 'secondary';
+      default: return 'outline';
+    }
+  };
+
+  const getRoleDisplayName = (role: string) => {
+    switch (role) {
+      case 'admin': return 'Administrador';
+      case 'teacher': return 'Profesor';
+      case 'student': return 'Estudiante';
+      default: return role;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-32">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Gestión de Usuarios
+            </CardTitle>
+            <CardDescription>
+              Administra usuarios y sus roles en el sistema
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Usuario</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Rol</TableHead>
+              <TableHead>Fecha de Registro</TableHead>
+              <TableHead>Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {users.map((user) => (
+              <TableRow key={user.id}>
+                <TableCell>
+                  <div className="font-medium">
+                    {user.full_name || 'Sin nombre'}
+                  </div>
+                </TableCell>
+                <TableCell>{user.email}</TableCell>
+                <TableCell>
+                  <Badge variant={getRoleBadgeVariant(user.user_roles[0]?.role || 'student')}>
+                    {getRoleDisplayName(user.user_roles[0]?.role || 'student')}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  {new Date(user.created_at).toLocaleDateString()}
+                </TableCell>
+                <TableCell>
+                  <Dialog open={isDialogOpen && selectedUser?.id === user.id} onOpenChange={(open) => {
+                    setIsDialogOpen(open);
+                    if (!open) setSelectedUser(null);
+                  }}>
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setNewRole(user.user_roles[0]?.role || 'student');
+                        }}
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        Editar Rol
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Editar Rol de Usuario</DialogTitle>
+                        <DialogDescription>
+                          Cambiar el rol de {user.full_name || user.email}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="role">Nuevo Rol</Label>
+                          <Select value={newRole} onValueChange={(value: 'admin' | 'teacher' | 'student') => setNewRole(value)}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="student">Estudiante</SelectItem>
+                              <SelectItem value="teacher">Profesor</SelectItem>
+                              <SelectItem value="admin">Administrador</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex justify-end space-x-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setIsDialogOpen(false);
+                              setSelectedUser(null);
+                            }}
+                          >
+                            Cancelar
+                          </Button>
+                          <Button
+                            onClick={() => updateUserRole(user.id, newRole)}
+                          >
+                            Actualizar Rol
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+};
+
+export default UserManagement;

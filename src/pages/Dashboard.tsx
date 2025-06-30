@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,6 +16,8 @@ import {
   Clock
 } from 'lucide-react';
 import Layout from '@/components/Layout';
+import AdminDashboard from '@/components/admin/AdminDashboard';
+import TeacherDashboard from '@/components/teacher/TeacherDashboard';
 
 interface Course {
   id: string;
@@ -36,7 +37,7 @@ interface CourseWithProgress extends Course {
 }
 
 const Dashboard = () => {
-  const { user, userRole } = useAuth();
+  const { user, userRole, loading } = useAuth();
   const [courses, setCourses] = useState<CourseWithProgress[]>([]);
   const [stats, setStats] = useState({
     totalCourses: 0,
@@ -57,9 +58,9 @@ const Dashboard = () => {
       if (userRole === 'student') {
         await fetchStudentData();
       } else if (userRole === 'teacher') {
-        await fetchTeacherData();
+        // await fetchTeacherData();
       } else if (userRole === 'admin') {
-        await fetchAdminData();
+        // await fetchAdminData();
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -117,55 +118,6 @@ const Dashboard = () => {
     }
   };
 
-  const fetchTeacherData = async () => {
-    // Fetch courses created by teacher
-    const { data: teacherCourses } = await supabase
-      .from('courses')
-      .select('*')
-      .eq('created_by', user?.id);
-
-    if (teacherCourses) {
-      setCourses(teacherCourses);
-      
-      // Count total students across all courses
-      const { data: studentCount } = await supabase
-        .from('course_assignments')
-        .select('user_id', { count: 'exact' })
-        .in('course_id', teacherCourses.map(c => c.id));
-
-      setStats({
-        totalCourses: teacherCourses.length,
-        completedCourses: 0,
-        activeCourses: teacherCourses.filter(c => c.status === 'active').length,
-        totalStudents: studentCount?.length || 0
-      });
-    }
-  };
-
-  const fetchAdminData = async () => {
-    // Fetch all courses for admin
-    const { data: allCourses } = await supabase
-      .from('courses')
-      .select('*');
-
-    if (allCourses) {
-      setCourses(allCourses);
-      
-      // Get total students count
-      const { data: profiles } = await supabase
-        .from('user_roles')
-        .select('user_id', { count: 'exact' })
-        .eq('role', 'student');
-
-      setStats({
-        totalCourses: allCourses.length,
-        completedCourses: 0,
-        activeCourses: allCourses.filter(c => c.status === 'active').length,
-        totalStudents: profiles?.length || 0
-      });
-    }
-  };
-
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case 'active': return 'default';
@@ -192,6 +144,15 @@ const Dashboard = () => {
         </div>
       </Layout>
     );
+  }
+
+  // Route to appropriate dashboard based on user role
+  if (userRole === 'admin') {
+    return <AdminDashboard />;
+  }
+
+  if (userRole === 'teacher') {
+    return <TeacherDashboard />;
   }
 
   return (
